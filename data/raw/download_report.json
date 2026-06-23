@@ -1,0 +1,50 @@
+{
+  "row_count": 303,
+  "column_count": 14,
+  "missing_required_columns": [],
+  "unexpected_columns": [],
+  "missing_value_counts": {
+    "age": 0,
+    "sex": 0,
+    "cp": 0,
+    "trestbps": 0,
+    "chol": 0,
+    "fbs": 0,
+    "restecg": 0,
+    "thalach": 0,
+    "exang": 0,
+    "oldpeak": 0,
+    "slope": 0,
+    "ca": 4,
+    "thal": 2,
+    "target": 0
+  },
+  "total_missing_values": 6,
+  "target_distribution": {
+    "0": 164,
+    "1": 139
+  },
+  "class_balance_pct": {
+    "0": 54.13,
+    "1": 45.87
+  },
+  "feature_dtypes": {
+    "age": "int64",
+    "sex": "int64",
+    "cp": "int64",
+    "trestbps": "int64",
+    "chol": "int64",
+    "fbs": "int64",
+    "restecg": "int64",
+    "thalach": "int64",
+    "exang": "int64",
+    "oldpeak": "float64",
+    "slope": "int64",
+    "ca": "float64",
+    "thal": "float64",
+    "target": "int64"
+  },
+  "download_timestamp": "2026-06-23T10:54:47.488082Z",
+  "method_used": "uci",
+  "output_file": "heart_disease_raw.csv"
+}

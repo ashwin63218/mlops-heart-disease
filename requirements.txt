@@ -1,0 +1,30 @@
+
+
+ucimlrepo==0.0.7            # Official UCI ML Repository Python client
+kaggle              # Kaggle API client (fallback download method)
+pandas==2.2.3               # Core data manipulation (2.x for Copy-on-Write)
+numpy==1.26.4               # Numerical computing (1.26.x: stable sklearn compat)
+
+scikit-learn==1.5.2         # Pipelines, preprocessing, models, metrics
+xgboost==2.1.4              # Optional third model (gradient boosting)
+imbalanced-learn==0.12.4    # SMOTE / resampling for class imbalance handling
+joblib==1.4.2               # Model serialisation (also used internally by sklearn)
+
+mlflow==2.14.3              # Experiment tracking, model registry, artifact logging
+dagshub==0.3.47             # Remote MLflow tracking server (DagsHub integration)
+
+onnx==1.16.2                # ONNX model format for cross-platform serving
+skl2onnx==1.17.0            # Convert sklearn pipelines → ONNX
+
+fastapi==0.111.1            # Async web framework for /predict endpoint
+uvicorn[standard]==0.30.6   # ASGI server to run FastAPI
+pydantic==2.7.4             # Request/response schema validation (FastAPI uses this)
+python-dotenv==1.0.1        # Load environment variables from .env file
+
+prometheus-fastapi-instrumentator==7.0.0   # Auto-expose /metrics for Prometheus
+
+matplotlib==3.9.2           # Base plotting library
+seaborn==0.13.2             # Statistical visualisations (heatmaps, distributions)
+pytest==8.3.2               # Unit testing framework
+pytest-cov==5.0.0           # Coverage reports for CI pipeline
+flake8==7.1.1               # PEP8 linting (used in GitHub Actions lint step)
