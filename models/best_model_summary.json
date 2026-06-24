@@ -1,0 +1,52 @@
+{
+  "best_model": "LogisticRegression",
+  "mlflow_run_id": "a6d354a75ea44e4d8b76e3ec4bb54792",
+  "best_params": {
+    "C": 10.0,
+    "penalty": "l2"
+  },
+  "cv_mean_roc_auc": 0.9019,
+  "cv_std_roc_auc": 0.0132,
+  "test_metrics": {
+    "test_accuracy": 0.8852,
+    "test_roc_auc": 0.9621,
+    "test_f1": 0.8814,
+    "test_precision": 0.8387,
+    "test_recall": 0.9286
+  },
+  "all_models": [
+    {
+      "model_name": "LogisticRegression",
+      "test_metrics": {
+        "test_accuracy": 0.8852,
+        "test_roc_auc": 0.9621,
+        "test_f1": 0.8814,
+        "test_precision": 0.8387,
+        "test_recall": 0.9286
+      },
+      "elapsed_seconds": 3.3
+    },
+    {
+      "model_name": "RandomForest",
+      "test_metrics": {
+        "test_accuracy": 0.8852,
+        "test_roc_auc": 0.9545,
+        "test_f1": 0.8814,
+        "test_precision": 0.8387,
+        "test_recall": 0.9286
+      },
+      "elapsed_seconds": 1.7
+    },
+    {
+      "model_name": "XGBoost",
+      "test_metrics": {
+        "test_accuracy": 0.8852,
+        "test_roc_auc": 0.9405,
+        "test_f1": 0.8772,
+        "test_precision": 0.8621,
+        "test_recall": 0.8929
+      },
+      "elapsed_seconds": 0.5
+    }
+  ]
+}

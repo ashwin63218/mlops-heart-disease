@@ -1,5 +1,6 @@
 
 
+setuptools<82
 ucimlrepo==0.0.7            # Official UCI ML Repository Python client
 kaggle              # Kaggle API client (fallback download method)
 pandas==2.2.3               # Core data manipulation (2.x for Copy-on-Write)

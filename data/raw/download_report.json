@@ -44,7 +44,7 @@
     "thal": "float64",
     "target": "int64"
   },
-  "download_timestamp": "2026-06-23T10:54:47.488082Z",
+  "download_timestamp": "2026-06-24T02:34:09.566779Z",
   "method_used": "uci",
   "output_file": "heart_disease_raw.csv"
 }
