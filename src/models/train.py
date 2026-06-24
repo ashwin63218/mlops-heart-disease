@@ -67,11 +67,31 @@ log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # MLflow tracking URI
-# Uses SQLite to stay compatible with both MLflow 2.x (requirements.txt pin)
-# and MLflow 3.x (what the sandbox may have installed).
+# Priority:
+#   1. DagsHub remote  
+#   2. Local SQLite    — fallback for offline / CI runs
 # ---------------------------------------------------------------------------
-MLFLOW_TRACKING_URI = f"sqlite:///{PROJECT_ROOT / 'mlflow.db'}"
+import os
+
 EXPERIMENT_NAME = "heart-disease-classification"
+
+_DAGSHUB_USER = os.getenv("DAGSHUB_USERNAME")
+_DAGSHUB_TOKEN = os.getenv("DAGSHUB_TOKEN")
+_DAGSHUB_REPO = os.getenv("DAGSHUB_REPO", "mlops-heart-disease")
+
+if _DAGSHUB_USER and _DAGSHUB_TOKEN:
+    MLFLOW_TRACKING_URI = (
+        f"https://dagshub.com/ashwin63218/mlops-heart-disease.mlflow"
+    )
+    # DagsHub requires basic-auth credentials on every request
+    os.environ["MLFLOW_TRACKING_USERNAME"] = _DAGSHUB_USER
+    os.environ["MLFLOW_TRACKING_PASSWORD"] = _DAGSHUB_TOKEN #1e9dd0c18f4efee86efabeb696387a89cb0815bb
+
+
+    _TRACKING_BACKEND = "dagshub"
+else:
+    MLFLOW_TRACKING_URI = f"sqlite:///{PROJECT_ROOT / 'mlflow.db'}"
+    _TRACKING_BACKEND = "local-sqlite"
 
 # ---------------------------------------------------------------------------
 # Model definitions
@@ -437,8 +457,9 @@ def run_training(tune: bool = True, cv_folds: int = 5) -> dict:
     mlflow.set_experiment(EXPERIMENT_NAME)
     experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
     experiment_id = experiment.experiment_id
-    log.info("MLflow tracking URI: %s", MLFLOW_TRACKING_URI)
-    log.info("Experiment: %s (id=%s)", EXPERIMENT_NAME, experiment_id)
+    log.info("MLflow backend  : %s", _TRACKING_BACKEND)
+    log.info("MLflow tracking : %s", MLFLOW_TRACKING_URI)
+    log.info("Experiment      : %s (id=%s)", EXPERIMENT_NAME, experiment_id)
 
     # ------------------------------------------------------------------
     # Train all models

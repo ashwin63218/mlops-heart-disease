@@ -1,6 +1,6 @@
 {
   "best_model": "LogisticRegression",
-  "mlflow_run_id": "a6d354a75ea44e4d8b76e3ec4bb54792",
+  "mlflow_run_id": "efa79e6ea7c64ef5a7bc3df022c01ff4",
   "best_params": {
     "C": 10.0,
     "penalty": "l2"
@@ -24,7 +24,7 @@
         "test_precision": 0.8387,
         "test_recall": 0.9286
       },
-      "elapsed_seconds": 3.3
+      "elapsed_seconds": 3.2
     },
     {
       "model_name": "RandomForest",
@@ -35,7 +35,7 @@
         "test_precision": 0.8387,
         "test_recall": 0.9286
       },
-      "elapsed_seconds": 1.7
+      "elapsed_seconds": 1.6
     },
     {
       "model_name": "XGBoost",
