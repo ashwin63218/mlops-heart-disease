@@ -29,3 +29,4 @@ seaborn==0.13.2             # Statistical visualisations (heatmaps, distribution
 pytest==8.3.2               # Unit testing framework
 pytest-cov==5.0.0           # Coverage reports for CI pipeline
 flake8==7.1.1               # PEP8 linting (used in GitHub Actions lint step)
+onnxruntime==1.19.2

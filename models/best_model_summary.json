@@ -1,6 +1,6 @@
 {
   "best_model": "LogisticRegression",
-  "mlflow_run_id": "efa79e6ea7c64ef5a7bc3df022c01ff4",
+  "mlflow_run_id": "40ac2a3f308c4f60881bebc548aa0099",
   "best_params": {
     "C": 10.0,
     "penalty": "l2"
@@ -24,7 +24,7 @@
         "test_precision": 0.8387,
         "test_recall": 0.9286
       },
-      "elapsed_seconds": 3.2
+      "elapsed_seconds": 3.3
     },
     {
       "model_name": "RandomForest",

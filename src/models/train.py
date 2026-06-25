@@ -45,6 +45,7 @@ from sklearn.metrics import (
     roc_curve,
 )
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier
 
 # ---------------------------------------------------------------------------
@@ -68,7 +69,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # MLflow tracking URI
 # Priority:
-#   1. DagsHub remote  
+#   1. DagsHub remote  — if DAGSHUB_USERNAME + DAGSHUB_TOKEN are set
 #   2. Local SQLite    — fallback for offline / CI runs
 # ---------------------------------------------------------------------------
 import os
@@ -81,13 +82,11 @@ _DAGSHUB_REPO = os.getenv("DAGSHUB_REPO", "mlops-heart-disease")
 
 if _DAGSHUB_USER and _DAGSHUB_TOKEN:
     MLFLOW_TRACKING_URI = (
-        f"https://dagshub.com/ashwin63218/mlops-heart-disease.mlflow"
+        f"https://dagshub.com/{_DAGSHUB_USER}/{_DAGSHUB_REPO}.mlflow"
     )
     # DagsHub requires basic-auth credentials on every request
     os.environ["MLFLOW_TRACKING_USERNAME"] = _DAGSHUB_USER
-    os.environ["MLFLOW_TRACKING_PASSWORD"] = _DAGSHUB_TOKEN #1e9dd0c18f4efee86efabeb696387a89cb0815bb
-
-
+    os.environ["MLFLOW_TRACKING_PASSWORD"] = _DAGSHUB_TOKEN
     _TRACKING_BACKEND = "dagshub"
 else:
     MLFLOW_TRACKING_URI = f"sqlite:///{PROJECT_ROOT / 'mlflow.db'}"
@@ -496,10 +495,33 @@ def run_training(tune: bool = True, cv_folds: int = 5) -> dict:
         best["test_metrics"]["test_roc_auc"],
     )
 
-    # Save best model artifact
+    # Save best model artifact — as a full sklearn Pipeline (preprocessor + model)
+    # This is the key reproducibility requirement: a single object handles
+    # raw 13-feature input all the way to prediction, with no external dependencies.
+    preprocessor_path = PROCESSED_DIR / "preprocessor.joblib"
+    if not preprocessor_path.exists():
+        log.error("preprocessor.joblib not found — run preprocess.py first.")
+        sys.exit(1)
+    preprocessor = joblib.load(preprocessor_path)
+
+    full_pipeline = Pipeline([
+        ("preprocessor", preprocessor),
+        ("classifier",   best["best_estimator"]),
+    ])
+
     best_model_path = MODELS_DIR / "best_model.joblib"
-    joblib.dump(best["best_estimator"], best_model_path)
-    log.info("Best model saved → %s", best_model_path)
+    joblib.dump(full_pipeline, best_model_path)
+    log.info("Full pipeline (preprocessor + %s) saved → %s",
+             best["model_name"], best_model_path)
+
+    # Also log the pipeline as an MLflow artifact on the best run
+    with mlflow.start_run(run_id=best["run_id"]):
+        mlflow.sklearn.log_model(
+            sk_model=full_pipeline,
+            artifact_path="pipeline",
+            input_example=pd.read_csv(PROCESSED_DIR / "X_train.csv").iloc[:5],
+        )
+    log.info("Full pipeline logged to MLflow run %s", best["run_id"])
 
     # Save best model summary JSON
     summary = {

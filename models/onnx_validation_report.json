@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "n_samples": 61,
+  "prediction_match_rate": 1.0,
+  "probability_max_diff": 1.1e-07,
+  "sklearn_model_type": "LogisticRegression",
+  "n_features": 20,
+  "target_opset": 17
+}
