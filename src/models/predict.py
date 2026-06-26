@@ -54,41 +54,51 @@ SUMMARY_PATH = MODELS_DIR / "best_model_summary.json"
 # Must match preprocess.py column taxonomy exactly.
 # ---------------------------------------------------------------------------
 RAW_FEATURE_NAMES: list[str] = [
-    "age", "sex", "cp", "trestbps", "chol",
-    "fbs", "restecg", "thalach", "exang",
-    "oldpeak", "slope", "ca", "thal",
+    "age",
+    "sex",
+    "cp",
+    "trestbps",
+    "chol",
+    "fbs",
+    "restecg",
+    "thalach",
+    "exang",
+    "oldpeak",
+    "slope",
+    "ca",
+    "thal",
 ]
 
 FEATURE_DTYPES: dict[str, str] = {
-    "age":      "float",
-    "sex":      "int",
-    "cp":       "int",
+    "age": "float",
+    "sex": "int",
+    "cp": "int",
     "trestbps": "float",
-    "chol":     "float",
-    "fbs":      "int",
-    "restecg":  "int",
-    "thalach":  "float",
-    "exang":    "int",
-    "oldpeak":  "float",
-    "slope":    "int",
-    "ca":       "float",   # nullable
-    "thal":     "float",   # nullable
+    "chol": "float",
+    "fbs": "int",
+    "restecg": "int",
+    "thalach": "float",
+    "exang": "int",
+    "oldpeak": "float",
+    "slope": "int",
+    "ca": "float",  # nullable
+    "thal": "float",  # nullable
 }
 
 FEATURE_RANGES: dict[str, tuple[float, float]] = {
-    "age":      (1,   120),
-    "sex":      (0,   1),
-    "cp":       (1,   4),
-    "trestbps": (50,  300),
-    "chol":     (50,  700),
-    "fbs":      (0,   1),
-    "restecg":  (0,   2),
-    "thalach":  (50,  250),
-    "exang":    (0,   1),
-    "oldpeak":  (0.0, 10.0),
-    "slope":    (1,   3),
-    "ca":       (0,   3),
-    "thal":     (3,   7),
+    "age": (1, 120),
+    "sex": (0, 1),
+    "cp": (1, 4),
+    "trestbps": (50, 300),
+    "chol": (50, 700),
+    "fbs": (0, 1),
+    "restecg": (0, 2),
+    "thalach": (50, 250),
+    "exang": (0, 1),
+    "oldpeak": (0.0, 10.0),
+    "slope": (1, 3),
+    "ca": (0, 3),
+    "thal": (3, 7),
 }
 
 # ---------------------------------------------------------------------------
@@ -186,13 +196,13 @@ class HeartDiseasePredictor:
             raise ValueError(f"backend must be 'sklearn' or 'onnx', got '{backend}'")
 
         self.backend = backend
-        self._model_path = (
-            model_path or (ONNX_MODEL_PATH if backend == "onnx" else SKLEARN_MODEL_PATH)
+        self._model_path = model_path or (
+            ONNX_MODEL_PATH if backend == "onnx" else SKLEARN_MODEL_PATH
         )
 
         # Pipeline (preprocessor + classifier) loaded lazily on first predict call
-        self._pipeline: Any = None       # sklearn Pipeline object
-        self._onnx_session: Any = None   # onnxruntime InferenceSession
+        self._pipeline: Any = None  # sklearn Pipeline object
+        self._onnx_session: Any = None  # onnxruntime InferenceSession
 
     # ------------------------------------------------------------------
     # Lazy loading
@@ -204,8 +214,7 @@ class HeartDiseasePredictor:
 
         if not self._model_path.exists():
             raise FileNotFoundError(
-                f"Model not found at {self._model_path}.\n"
-                "Run: python -m src.models.train"
+                f"Model not found at {self._model_path}.\n" "Run: python -m src.models.train"
             )
 
         # Always load the sklearn Pipeline — it contains the preprocessor
@@ -224,8 +233,7 @@ class HeartDiseasePredictor:
                 import onnxruntime as rt  # type: ignore
             except ImportError as exc:
                 raise ImportError(
-                    "onnxruntime is required for ONNX backend.\n"
-                    "Install: pip install onnxruntime"
+                    "onnxruntime is required for ONNX backend.\n" "Install: pip install onnxruntime"
                 ) from exc
             log.info("Loading ONNX session from %s", self._model_path)
             self._onnx_session = rt.InferenceSession(
@@ -263,9 +271,9 @@ class HeartDiseasePredictor:
         else:
             raw_probs = np.array(raw_probs, dtype=np.float32)
             if raw_probs.ndim == 2:
-                probs = raw_probs[:, 1]   # column 1 = P(disease)
+                probs = raw_probs[:, 1]  # column 1 = P(disease)
             else:
-                probs = raw_probs         # already (N,)
+                probs = raw_probs  # already (N,)
 
         return preds, probs
 
@@ -355,7 +363,9 @@ class HeartDiseasePredictor:
 
         log.info(
             "Batch prediction: %d rows in %.1f ms (%.2f ms/row)",
-            len(df), latency_ms, latency_ms / max(len(df), 1),
+            len(df),
+            latency_ms,
+            latency_ms / max(len(df), 1),
         )
         return result
 
@@ -371,7 +381,8 @@ class HeartDiseasePredictor:
             "model_path": str(self._model_path),
             "pipeline_steps": (
                 list(self._pipeline.named_steps.keys())
-                if self._pipeline else ["preprocessor", "classifier"]
+                if self._pipeline
+                else ["preprocessor", "classifier"]
             ),
         }
         if SUMMARY_PATH.exists():
@@ -407,15 +418,15 @@ def export_to_onnx(
         from skl2onnx.common.data_types import FloatTensorType
     except ImportError as exc:
         raise ImportError(
-            "skl2onnx is required for ONNX export.\n"
-            "Install: pip install skl2onnx onnx"
+            "skl2onnx is required for ONNX export.\n" "Install: pip install skl2onnx onnx"
         ) from exc
 
     log.info("=== ONNX Export ===")
 
     if not sklearn_model_path.exists():
-        raise FileNotFoundError(f"Pipeline not found: {sklearn_model_path}\n"
-                                "Run: python -m src.models.train")
+        raise FileNotFoundError(
+            f"Pipeline not found: {sklearn_model_path}\n" "Run: python -m src.models.train"
+        )
 
     log.info("Loading Pipeline from %s", sklearn_model_path)
     pipeline = joblib.load(sklearn_model_path)
@@ -480,7 +491,9 @@ def export_to_onnx(
         }
         log.info(
             "Validation: pred_match=%.4f  prob_max_diff=%.2e  status=%s",
-            pred_match, prob_max_diff, validation_report["status"],
+            pred_match,
+            prob_max_diff,
+            validation_report["status"],
         )
     else:
         log.warning("Test data not found — skipping ONNX validation.")
@@ -508,9 +521,19 @@ def export_to_onnx(
 def _smoke_test() -> None:
     """End-to-end check: sklearn predict → ONNX export → ONNX predict → batch."""
     SAMPLE = {
-        "age": 52.0, "sex": 1, "cp": 4, "trestbps": 125.0,
-        "chol": 212.0, "fbs": 0, "restecg": 1, "thalach": 168.0,
-        "exang": 0, "oldpeak": 1.0, "slope": 2, "ca": 2.0, "thal": 7.0,
+        "age": 52.0,
+        "sex": 1,
+        "cp": 4,
+        "trestbps": 125.0,
+        "chol": 212.0,
+        "fbs": 0,
+        "restecg": 1,
+        "thalach": 168.0,
+        "exang": 0,
+        "oldpeak": 1.0,
+        "slope": 2,
+        "ca": 2.0,
+        "thal": 7.0,
     }
 
     print("\n── Smoke Test ───────────────────────────────────────────")
@@ -546,10 +569,12 @@ def _smoke_test() -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Heart Disease model packaging.")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--export", action="store_true",
-                       help="Export best_model.joblib to best_model.onnx")
-    group.add_argument("--smoke-test", action="store_true",
-                       help="Run end-to-end smoke test (sklearn + ONNX)")
+    group.add_argument(
+        "--export", action="store_true", help="Export best_model.joblib to best_model.onnx"
+    )
+    group.add_argument(
+        "--smoke-test", action="store_true", help="Run end-to-end smoke test (sklearn + ONNX)"
+    )
     args = parser.parse_args()
 
     if args.export:

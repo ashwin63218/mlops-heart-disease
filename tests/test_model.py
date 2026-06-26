@@ -81,28 +81,27 @@ class TestSinglePrediction:
     def test_predict_has_required_keys(self, predictor, sample_patient):
         result = predictor.predict(sample_patient)
         required = {"prediction", "probability", "risk_label", "latency_ms"}
-        assert required <= result.keys(), (
-            f"Missing keys: {required - result.keys()}"
-        )
+        assert required <= result.keys(), f"Missing keys: {required - result.keys()}"
 
     def test_prediction_is_binary(self, predictor, sample_patient):
         result = predictor.predict(sample_patient)
-        assert result["prediction"] in (0, 1), (
-            f"prediction must be 0 or 1, got {result['prediction']}"
-        )
+        assert result["prediction"] in (
+            0,
+            1,
+        ), f"prediction must be 0 or 1, got {result['prediction']}"
 
     def test_probability_in_unit_interval(self, predictor, sample_patient):
         result = predictor.predict(sample_patient)
         prob = result["probability"]
-        assert 0.0 <= prob <= 1.0, (
-            f"probability must be in [0, 1], got {prob}"
-        )
+        assert 0.0 <= prob <= 1.0, f"probability must be in [0, 1], got {prob}"
 
     def test_risk_label_valid(self, predictor, sample_patient):
         result = predictor.predict(sample_patient)
-        assert result["risk_label"] in ("Low", "Moderate", "High"), (
-            f"Unexpected risk_label: {result['risk_label']}"
-        )
+        assert result["risk_label"] in (
+            "Low",
+            "Moderate",
+            "High",
+        ), f"Unexpected risk_label: {result['risk_label']}"
 
     def test_risk_label_consistent_with_probability(self, predictor, sample_patient):
         """Risk label thresholds: Low < 0.35, Moderate 0.35–0.65, High >= 0.65."""
@@ -122,11 +121,9 @@ class TestSinglePrediction:
 
     def test_latency_under_500ms(self, predictor, sample_patient):
         """Single inference must complete in under 500ms (after model is loaded)."""
-        _ = predictor.predict(sample_patient)   # warm up
+        _ = predictor.predict(sample_patient)  # warm up
         result = predictor.predict(sample_patient)
-        assert result["latency_ms"] < 500, (
-            f"Inference too slow: {result['latency_ms']:.1f}ms"
-        )
+        assert result["latency_ms"] < 500, f"Inference too slow: {result['latency_ms']:.1f}ms"
 
     def test_deterministic_output(self, predictor, sample_patient):
         """Same input must produce identical output on repeated calls."""
@@ -142,9 +139,9 @@ class TestSinglePrediction:
 class TestBatchPrediction:
     def test_batch_output_shape(self, predictor, sample_batch_df):
         result = predictor.predict_batch(sample_batch_df)
-        assert len(result) == len(sample_batch_df), (
-            f"Output rows ({len(result)}) != input rows ({len(sample_batch_df)})"
-        )
+        assert len(result) == len(
+            sample_batch_df
+        ), f"Output rows ({len(result)}) != input rows ({len(sample_batch_df)})"
 
     def test_batch_has_required_columns(self, predictor, sample_batch_df):
         result = predictor.predict_batch(sample_batch_df)
@@ -153,16 +150,17 @@ class TestBatchPrediction:
 
     def test_batch_predictions_binary(self, predictor, sample_batch_df):
         result = predictor.predict_batch(sample_batch_df)
-        assert set(result["prediction"].unique()) <= {0, 1}, (
-            f"Non-binary predictions: {result['prediction'].unique()}"
-        )
+        assert set(result["prediction"].unique()) <= {
+            0,
+            1,
+        }, f"Non-binary predictions: {result['prediction'].unique()}"
 
     def test_batch_probabilities_in_unit_interval(self, predictor, sample_batch_df):
         result = predictor.predict_batch(sample_batch_df)
         probs = result["probability"]
-        assert (probs >= 0.0).all() and (probs <= 1.0).all(), (
-            f"Probabilities out of [0,1]: min={probs.min()}, max={probs.max()}"
-        )
+        assert (probs >= 0.0).all() and (
+            probs <= 1.0
+        ).all(), f"Probabilities out of [0,1]: min={probs.min()}, max={probs.max()}"
 
     def test_batch_risk_labels_valid(self, predictor, sample_batch_df):
         result = predictor.predict_batch(sample_batch_df)
@@ -244,7 +242,7 @@ class TestInputValidation:
 
     def test_predict_raises_on_bad_input(self, predictor):
         with pytest.raises(ValidationError):
-            predictor.predict({"age": 52})   # missing 12 features
+            predictor.predict({"age": 52})  # missing 12 features
 
 
 # ---------------------------------------------------------------------------
@@ -280,9 +278,7 @@ class TestONNX:
         p = HeartDiseasePredictor(backend="onnx", model_path=onnx_model_path)
         assert not p.is_loaded
 
-    def test_onnx_predictions_match_sklearn(
-        self, predictor, models_dir, sample_batch_df
-    ):
+    def test_onnx_predictions_match_sklearn(self, predictor, models_dir, sample_batch_df):
         """ONNX and sklearn backends must agree on all predictions."""
         onnx_model_path = models_dir / "best_model.onnx"
         if not onnx_model_path.exists():
