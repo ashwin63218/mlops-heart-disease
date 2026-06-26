@@ -1,0 +1,43 @@
+# Version control
+.git
+.gitignore
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+dist/
+build/
+
+# Development / test artefacts
+.pytest_cache
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# Notebooks and raw data (not needed at inference time)
+notebooks/
+data/raw/
+data/processed/
+
+# MLflow tracking (not needed in container)
+mlflow.db
+mlruns/
+
+# Environment files with secrets
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Large intermediate model artefacts (keep only best_model.*)
+models/artifacts/
