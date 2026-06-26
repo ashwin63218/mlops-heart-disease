@@ -1,0 +1,247 @@
+name: CI Pipeline — Heart Disease MLOps
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:       # allow manual trigger from GitHub UI
+
+# Cancel in-progress runs on the same branch to save minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.10"
+  # DagsHub credentials injected from GitHub Secrets (set in repo Settings → Secrets)
+  # Training will fall back to local SQLite if these are not set
+  DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+  DAGSHUB_TOKEN:    ${{ secrets.DAGSHUB_TOKEN }}
+  DAGSHUB_REPO:     ${{ secrets.DAGSHUB_REPO }}
+
+# ---------------------------------------------------------------------------
+# Job 1 — Lint
+# Fails loudly on any flake8 violation. No warnings are silently swallowed.
+# ---------------------------------------------------------------------------
+jobs:
+  lint:
+    name: "Lint (flake8)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install lint dependencies
+        run: pip install flake8==7.1.1
+
+      - name: Run flake8
+        run: |
+          flake8 src/ tests/ \
+            --max-line-length=100 \
+            --exclude=__pycache__,.git,.venv \
+            --statistics \
+            --count
+        # Non-zero exit code from flake8 automatically fails this step
+
+      - name: Check for debug leftovers
+        run: |
+          # Fail if any breakpoint() or pdb calls were accidentally committed
+          if grep -rn "breakpoint()\|import pdb\|pdb.set_trace()" src/ tests/; then
+            echo "❌ Debug statements found — remove before merging."
+            exit 1
+          fi
+          echo "✅ No debug statements found."
+
+# ---------------------------------------------------------------------------
+# Job 2 — Test
+# Runs the full pytest suite. Requires lint to pass first.
+# ---------------------------------------------------------------------------
+  test:
+    name: "Test (pytest)"
+    runs-on: ubuntu-latest
+    needs: lint          # don't waste test minutes if lint fails
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install setuptools          # required for pkg_resources on Python 3.12+
+          pip install -r requirements.txt
+
+      - name: Download dataset
+        run: python -m src.data.download_data
+        # Exit code != 0 fails the job — no silent data errors
+
+      - name: Preprocess data
+        run: python -m src.data.preprocess
+
+      - name: Run fast smoke training (no tuning, 2-fold CV)
+        # Generates best_model.joblib needed by test_model.py
+        run: |
+          python -m src.models.train --no-tune --cv-folds 2
+
+      - name: Export ONNX model
+        run: python -m src.models.predict --export
+
+      - name: Run pytest
+        run: |
+          pytest tests/ \
+            --tb=short \
+            --strict-markers \
+            -v \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=70
+        # --cov-fail-under=70 → job fails if coverage drops below 70%
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()     # upload even if tests fail — useful for debugging
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 14
+
+# ---------------------------------------------------------------------------
+# Job 3 — Train
+# Full training run with tuning. Uploads model artifacts and metrics JSON.
+# Only runs on pushes to main (not on every PR to save CI minutes).
+# ---------------------------------------------------------------------------
+  train:
+    name: "Train (full pipeline)"
+    runs-on: ubuntu-latest
+    needs: test          # only train if all tests pass
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install setuptools
+          pip install -r requirements.txt
+
+      - name: Download dataset
+        run: python -m src.data.download_data
+
+      - name: Preprocess data
+        run: python -m src.data.preprocess
+
+      - name: Train all models (full GridSearchCV, 5-fold CV)
+        run: |
+          python -m src.models.train --cv-folds 5
+        # Pushes metrics to DagsHub if DAGSHUB_* secrets are set,
+        # otherwise writes to local mlflow.db (no secrets = no crash)
+
+      - name: Export best model to ONNX
+        run: python -m src.models.predict --export
+
+      - name: Run ONNX smoke test
+        run: python -m src.models.predict --smoke-test
+
+      - name: Assert minimum AUC threshold
+        run: |
+          python - << 'EOF'
+          import json, sys
+          from pathlib import Path
+
+          summary_path = Path("models/best_model_summary.json")
+          if not summary_path.exists():
+              print("❌ best_model_summary.json not found")
+              sys.exit(1)
+
+          summary = json.loads(summary_path.read_text())
+          auc = summary["test_metrics"]["test_roc_auc"]
+          threshold = 0.80
+
+          print(f"Best model : {summary['best_model']}")
+          print(f"Test AUC   : {auc:.4f}  (threshold: {threshold})")
+
+          if auc < threshold:
+              print(f"❌ AUC {auc:.4f} is below minimum threshold {threshold}")
+              sys.exit(1)
+
+          print(f"✅ AUC {auc:.4f} meets minimum threshold {threshold}")
+          EOF
+
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: best-model
+          path: |
+            models/best_model.joblib
+            models/best_model.onnx
+            models/best_model_summary.json
+            models/onnx_validation_report.json
+            models/roc_comparison.png
+          retention-days: 30
+
+      - name: Upload metrics JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-metrics
+          path: models/best_model_summary.json
+          retention-days: 90   # keep metrics longer than model weights
+
+      - name: Upload MLflow database
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mlflow-db
+          path: mlflow.db
+          retention-days: 14
+
+      - name: Print final leaderboard
+        if: always()
+        run: |
+          python - << 'EOF'
+          import json
+          from pathlib import Path
+
+          summary_path = Path("models/best_model_summary.json")
+          if not summary_path.exists():
+              print("Summary not found.")
+          else:
+              summary = json.loads(summary_path.read_text())
+              print("\n" + "=" * 60)
+              print(f"  BEST MODEL : {summary['best_model']}")
+              print(f"  RUN ID     : {summary['mlflow_run_id']}")
+              print("=" * 60)
+              print(f"  {'MODEL':<22} {'AUC':>8} {'F1':>8}")
+              print("-" * 60)
+              for m in summary.get("all_models", []):
+                  marker = " ← best" if m["model_name"] == summary["best_model"] else ""
+                  print(
+                      f"  {m['model_name']:<22} "
+                      f"{m['test_metrics']['test_roc_auc']:>8.4f} "
+                      f"{m['test_metrics']['test_f1']:>8.4f}"
+                      f"{marker}"
+                  )
+              print("=" * 60)
+          EOF
