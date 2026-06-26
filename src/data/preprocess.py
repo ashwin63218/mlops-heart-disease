@@ -65,12 +65,7 @@ NOMINAL_WITH_NAN_COLS = ["ca", "thal"]
 # Derived: drop before modelling (source tag from download script)
 DROP_COLS = ["source"]
 
-ALL_FEATURE_COLS = (
-    CONTINUOUS_COLS
-    + BINARY_COLS
-    + NOMINAL_COLS
-    + NOMINAL_WITH_NAN_COLS
-)
+ALL_FEATURE_COLS = CONTINUOUS_COLS + BINARY_COLS + NOMINAL_COLS + NOMINAL_WITH_NAN_COLS
 
 TARGET_COL = "target"
 
@@ -79,13 +74,13 @@ TARGET_COL = "target"
 # Step 1 — Load raw data
 # ---------------------------------------------------------------------------
 
+
 def load_raw(path: Path) -> pd.DataFrame:
     """Load CSV produced by download_data.py."""
     log.info(f"Loading raw data from: {path}")
     if not path.exists():
         raise FileNotFoundError(
-            f"Raw data file not found: {path}\n"
-            "Run: python src/data/download_data.py"
+            f"Raw data file not found: {path}\n" "Run: python src/data/download_data.py"
         )
     df = pd.read_csv(path)
     log.info(f"Loaded {len(df)} rows × {len(df.columns)} columns")
@@ -96,9 +91,10 @@ def load_raw(path: Path) -> pd.DataFrame:
 # Step 2 — Basic data cleaning
 # ---------------------------------------------------------------------------
 
+
 def clean(df: pd.DataFrame) -> pd.DataFrame:
     """
-    
+
 
     1. Drop metadata columns (source tag).
     2. Binarise target: UCI uses 0=no disease, 1-4=disease severity.
@@ -141,11 +137,11 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
 
     # 2d. Range validation — warn but do NOT silently drop clinical outliers
     range_checks = {
-        "age":      (1, 120),
+        "age": (1, 120),
         "trestbps": (50, 250),
-        "chol":     (50, 700),
-        "thalach":  (40, 250),
-        "oldpeak":  (0, 10),
+        "chol": (50, 700),
+        "thalach": (40, 250),
+        "oldpeak": (0, 10),
     }
     for col, (lo, hi) in range_checks.items():
         if col not in df.columns:
@@ -164,8 +160,7 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
         log.warning(f"Dropped {n_dupes} exact duplicate rows.")
 
     log.info(
-        f"Cleaning complete: {original_len} → {len(df)} rows "
-        f"({original_len - len(df)} removed)"
+        f"Cleaning complete: {original_len} → {len(df)} rows " f"({original_len - len(df)} removed)"
     )
     return df.reset_index(drop=True)
 
@@ -173,6 +168,7 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Step 3 — Split features / target
 # ---------------------------------------------------------------------------
+
 
 def split_features_target(
     df: pd.DataFrame,
@@ -203,6 +199,7 @@ def split_features_target(
 # Step 4 — Build preprocessing pipeline
 # ---------------------------------------------------------------------------
 
+
 def build_preprocessor() -> ColumnTransformer:
     """
     Constructs the sklearn ColumnTransformer.
@@ -227,46 +224,52 @@ def build_preprocessor() -> ColumnTransformer:
     """
 
     # A: Continuous
-    continuous_transformer = Pipeline(steps=[
-        ("scaler", RobustScaler()),
-    ])
+    continuous_transformer = Pipeline(
+        steps=[
+            ("scaler", RobustScaler()),
+        ]
+    )
 
     # B: Binary — passthrough (sklearn will leave these as-is)
     # Handled via remainder or explicit passthrough below
 
     # C: Nominal without NaN
-    nominal_transformer = Pipeline(steps=[
-        (
-            "encoder",
-            OneHotEncoder(
-                drop="first",           # k-1 encoding, avoids dummy trap
-                handle_unknown="ignore",
-                sparse_output=False,    # return dense array (easier to debug)
+    nominal_transformer = Pipeline(
+        steps=[
+            (
+                "encoder",
+                OneHotEncoder(
+                    drop="first",  # k-1 encoding, avoids dummy trap
+                    handle_unknown="ignore",
+                    sparse_output=False,  # return dense array (easier to debug)
+                ),
             ),
-        ),
-    ])
+        ]
+    )
 
     # D: Nominal with NaN — impute then encode
-    nominal_nan_transformer = Pipeline(steps=[
-        (
-            "imputer",
-            SimpleImputer(strategy="most_frequent"),
-        ),
-        (
-            "encoder",
-            OneHotEncoder(
-                drop="first",
-                handle_unknown="ignore",
-                sparse_output=False,
+    nominal_nan_transformer = Pipeline(
+        steps=[
+            (
+                "imputer",
+                SimpleImputer(strategy="most_frequent"),
             ),
-        ),
-    ])
+            (
+                "encoder",
+                OneHotEncoder(
+                    drop="first",
+                    handle_unknown="ignore",
+                    sparse_output=False,
+                ),
+            ),
+        ]
+    )
 
     preprocessor = ColumnTransformer(
         transformers=[
             ("continuous", continuous_transformer, CONTINUOUS_COLS),
-            ("binary",     "passthrough",          BINARY_COLS),
-            ("nominal",    nominal_transformer,     NOMINAL_COLS),
+            ("binary", "passthrough", BINARY_COLS),
+            ("nominal", nominal_transformer, NOMINAL_COLS),
             ("nominal_nan", nominal_nan_transformer, NOMINAL_WITH_NAN_COLS),
         ],
         remainder="drop",
@@ -288,6 +291,7 @@ def get_feature_names(preprocessor: ColumnTransformer) -> list[str]:
 # Step 5 — Train/test split
 # ---------------------------------------------------------------------------
 
+
 def split_train_test(
     X: pd.DataFrame,
     y: pd.Series,
@@ -299,10 +303,11 @@ def split_train_test(
     Stratification is non-negotiable for a medical binary classifier.
     """
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
+        X,
+        y,
         test_size=test_size,
         random_state=seed,
-        stratify=y,       # preserve 0/1 ratio in both splits
+        stratify=y,  # preserve 0/1 ratio in both splits
     )
     log.info(
         f"Train: {len(X_train)} rows  |  "
@@ -310,20 +315,15 @@ def split_train_test(
         f"Test size: {test_size:.0%}  |  "
         f"Seed: {seed}"
     )
-    log.info(
-        f"Train class balance: "
-        f"{y_train.value_counts(normalize=True).round(3).to_dict()}"
-    )
-    log.info(
-        f"Test class balance:  "
-        f"{y_test.value_counts(normalize=True).round(3).to_dict()}"
-    )
+    log.info(f"Train class balance: " f"{y_train.value_counts(normalize=True).round(3).to_dict()}")
+    log.info(f"Test class balance:  " f"{y_test.value_counts(normalize=True).round(3).to_dict()}")
     return X_train, X_test, y_train, y_test
 
 
 # ---------------------------------------------------------------------------
 # Step 6 — Fit & transform
 # ---------------------------------------------------------------------------
+
 
 def fit_transform(
     preprocessor: ColumnTransformer,
@@ -344,12 +344,8 @@ def fit_transform(
 
     feature_names = get_feature_names(preprocessor)
 
-    X_train_df = pd.DataFrame(
-        X_train_processed, columns=feature_names, dtype=float
-    )
-    X_test_df = pd.DataFrame(
-        X_test_processed, columns=feature_names, dtype=float
-    )
+    X_train_df = pd.DataFrame(X_train_processed, columns=feature_names, dtype=float)
+    X_test_df = pd.DataFrame(X_test_processed, columns=feature_names, dtype=float)
 
     log.info(
         f"Processed feature matrix: "
@@ -363,6 +359,7 @@ def fit_transform(
 # ---------------------------------------------------------------------------
 # Step 7 — Save outputs
 # ---------------------------------------------------------------------------
+
 
 def save_outputs(
     X_train: pd.DataFrame,
@@ -388,8 +385,6 @@ def save_outputs(
     log.info(f"Saved y_train.csv  : {y_train.shape}")
     log.info(f"Saved y_test.csv   : {y_test.shape}")
     log.info(f"Saved preprocessor : {preprocessor_path}")
-
-
 
 
 def run_preprocessing(
@@ -431,17 +426,13 @@ def run_preprocessing(
     save_outputs(X_train, X_test, y_train, y_test, preprocessor, output_dir)
 
     summary = {
-        "n_train":             len(X_train),
-        "n_test":              len(X_test),
-        "n_raw_features":      len(ALL_FEATURE_COLS),
+        "n_train": len(X_train),
+        "n_test": len(X_test),
+        "n_raw_features": len(ALL_FEATURE_COLS),
         "n_processed_features": X_train.shape[1],
-        "feature_names":       list(X_train.columns),
-        "class_balance_train": (
-            y_train.value_counts(normalize=True).round(4).to_dict()
-        ),
-        "class_balance_test":  (
-            y_test.value_counts(normalize=True).round(4).to_dict()
-        ),
+        "feature_names": list(X_train.columns),
+        "class_balance_train": (y_train.value_counts(normalize=True).round(4).to_dict()),
+        "class_balance_test": (y_test.value_counts(normalize=True).round(4).to_dict()),
     }
 
     log.info("=" * 60)
@@ -458,6 +449,7 @@ def run_preprocessing(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(

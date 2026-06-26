@@ -45,35 +45,33 @@ log = logging.getLogger(__name__)
 
 # UCI Heart Disease dataset: 4 sub-datasets (Cleveland is the most used,
 # but we combine all 4 to create a richer, more original dataset)
-_UCI_BASE = (
-    "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease"
-)
+_UCI_BASE = "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease"
 UCI_DIRECT_URLS = {
-    "cleveland":  f"{_UCI_BASE}/processed.cleveland.data",
-    "hungarian":  f"{_UCI_BASE}/processed.hungarian.data",
+    "cleveland": f"{_UCI_BASE}/processed.cleveland.data",
+    "hungarian": f"{_UCI_BASE}/processed.hungarian.data",
     "switzerland": f"{_UCI_BASE}/processed.switzerland.data",
-    "va":         f"{_UCI_BASE}/processed.va.data",
+    "va": f"{_UCI_BASE}/processed.va.data",
 }
 
 # Column names as defined in the UCI dataset documentation
 COLUMN_NAMES = [
-    "age",       # age in years
-    "sex",       # 1 = male, 0 = female
-    "cp",        # chest pain type (1-4)
+    "age",  # age in years
+    "sex",  # 1 = male, 0 = female
+    "cp",  # chest pain type (1-4)
     "trestbps",  # resting blood pressure (mm Hg)
-    "chol",      # serum cholesterol (mg/dl)
-    "fbs",       # fasting blood sugar > 120 mg/dl (1=true, 0=false)
-    "restecg",   # resting ECG results (0-2)
-    "thalach",   # maximum heart rate achieved
-    "exang",     # exercise induced angina (1=yes, 0=no)
-    "oldpeak",   # ST depression induced by exercise vs rest
-    "slope",     # slope of peak exercise ST segment (1-3)
-    "ca",        # major vessels coloured by fluoroscopy (0-3)
-    "thal",      # thalassemia (3=normal, 6=fixed, 7=reversible)
-    "target",    # diagnosis (0=no disease, 1-4=disease; binarised)
+    "chol",  # serum cholesterol (mg/dl)
+    "fbs",  # fasting blood sugar > 120 mg/dl (1=true, 0=false)
+    "restecg",  # resting ECG results (0-2)
+    "thalach",  # maximum heart rate achieved
+    "exang",  # exercise induced angina (1=yes, 0=no)
+    "oldpeak",  # ST depression induced by exercise vs rest
+    "slope",  # slope of peak exercise ST segment (1-3)
+    "ca",  # major vessels coloured by fluoroscopy (0-3)
+    "thal",  # thalassemia (3=normal, 6=fixed, 7=reversible)
+    "target",  # diagnosis (0=no disease, 1-4=disease; binarised)
 ]
 
-KAGGLE_DATASET = "ronitf/heart-disease-uci"   # fallback Kaggle dataset slug
+KAGGLE_DATASET = "ronitf/heart-disease-uci"  # fallback Kaggle dataset slug
 OUTPUT_FILENAME = "heart_disease_raw.csv"
 REPORT_FILENAME = "download_report.json"
 
@@ -81,6 +79,7 @@ REPORT_FILENAME = "download_report.json"
 # ---------------------------------------------------------------------------
 # Download Methods
 # ---------------------------------------------------------------------------
+
 
 def download_via_ucimlrepo(output_dir: Path) -> pd.DataFrame:
     """
@@ -93,9 +92,7 @@ def download_via_ucimlrepo(output_dir: Path) -> pd.DataFrame:
     try:
         from ucimlrepo import fetch_ucirepo
     except ImportError:
-        raise ImportError(
-            "ucimlrepo is not installed. Run: pip install ucimlrepo"
-        )
+        raise ImportError("ucimlrepo is not installed. Run: pip install ucimlrepo")
 
     dataset = fetch_ucirepo(id=45)
     X = dataset.data.features
@@ -136,11 +133,12 @@ def download_via_direct_url(output_dir: Path) -> pd.DataFrame:
                 raw = resp.read().decode("utf-8")
 
         from io import StringIO
+
         df_part = pd.read_csv(
             StringIO(raw),
             header=None,
             names=COLUMN_NAMES,
-            na_values="?",      # UCI uses '?' for missing values
+            na_values="?",  # UCI uses '?' for missing values
         )
         df_part["source"] = source_name  # track origin for analysis
         frames.append(df_part)
@@ -163,9 +161,7 @@ def download_via_kaggle(output_dir: Path) -> pd.DataFrame:
     try:
         import kaggle  # noqa: F401 — triggers credential check on import
     except ImportError:
-        raise ImportError(
-            "kaggle package not installed. Run: pip install kaggle"
-        )
+        raise ImportError("kaggle package not installed. Run: pip install kaggle")
     except OSError as e:
         raise OSError(
             f"Kaggle credentials not found: {e}\n"
@@ -174,14 +170,19 @@ def download_via_kaggle(output_dir: Path) -> pd.DataFrame:
         )
 
     import subprocess
+
     kaggle_dir = output_dir / "kaggle_tmp"
     kaggle_dir.mkdir(parents=True, exist_ok=True)
 
     result = subprocess.run(
         [
-            "kaggle", "datasets", "download",
-            "-d", KAGGLE_DATASET,
-            "-p", str(kaggle_dir),
+            "kaggle",
+            "datasets",
+            "download",
+            "-d",
+            KAGGLE_DATASET,
+            "-p",
+            str(kaggle_dir),
             "--unzip",
         ],
         capture_output=True,
@@ -189,22 +190,19 @@ def download_via_kaggle(output_dir: Path) -> pd.DataFrame:
     )
 
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Kaggle CLI failed:\n{result.stderr}"
-        )
+        raise RuntimeError(f"Kaggle CLI failed:\n{result.stderr}")
 
     # Find the downloaded CSV
     csv_files = list(kaggle_dir.glob("*.csv"))
     if not csv_files:
-        raise FileNotFoundError(
-            f"No CSV found in {kaggle_dir} after Kaggle download."
-        )
+        raise FileNotFoundError(f"No CSV found in {kaggle_dir} after Kaggle download.")
 
     df = pd.read_csv(csv_files[0])
     log.info(f"Kaggle download successful — shape: {df.shape}")
 
     # Clean up temp dir
     import shutil
+
     shutil.rmtree(kaggle_dir)
 
     return df
@@ -213,6 +211,7 @@ def download_via_kaggle(output_dir: Path) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Post-Download Processing
 # ---------------------------------------------------------------------------
+
 
 def binarise_target(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -257,9 +256,7 @@ def validate_dataset(df: pd.DataFrame) -> dict:
         "missing_value_counts": df.isnull().sum().to_dict(),
         "total_missing_values": int(df.isnull().sum().sum()),
         "target_distribution": df["target"].value_counts().to_dict(),
-        "class_balance_pct": (
-            df["target"].value_counts(normalize=True) * 100
-        ).round(2).to_dict(),
+        "class_balance_pct": (df["target"].value_counts(normalize=True) * 100).round(2).to_dict(),
         "feature_dtypes": df.dtypes.astype(str).to_dict(),
     }
 
@@ -301,15 +298,16 @@ def save_report(report: dict, output_dir: Path, method_used: str) -> Path:
 # Main Orchestration
 # ---------------------------------------------------------------------------
 
+
 def download_dataset(method: str, output_dir: Path) -> tuple[pd.DataFrame, str]:
     """
     Tries download methods in order until one succeeds.
     Returns (DataFrame, method_name_that_worked).
     """
     methods = {
-        "uci":     download_via_ucimlrepo,
-        "direct":  download_via_direct_url,
-        "kaggle":  download_via_kaggle,
+        "uci": download_via_ucimlrepo,
+        "direct": download_via_direct_url,
+        "kaggle": download_via_kaggle,
     }
 
     if method != "auto":
@@ -390,9 +388,7 @@ def main():
 
     # Exit with error code if critical columns are missing
     if report["missing_required_columns"]:
-        log.error(
-            f"Dataset is missing required columns: {report['missing_required_columns']}"
-        )
+        log.error(f"Dataset is missing required columns: {report['missing_required_columns']}")
         sys.exit(1)
 
 

@@ -9,9 +9,9 @@ Fixtures are scoped to minimise I/O:
 
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
+
 
 # ---------------------------------------------------------------------------
 # Project root — works regardless of where pytest is invoked from
@@ -89,9 +89,19 @@ def y_test(processed_dir: Path) -> pd.Series:
 def sample_patient() -> dict:
     """A single valid patient record (all 13 raw features)."""
     return {
-        "age": 52.0, "sex": 1, "cp": 4, "trestbps": 125.0,
-        "chol": 212.0, "fbs": 0, "restecg": 1, "thalach": 168.0,
-        "exang": 0, "oldpeak": 1.0, "slope": 2, "ca": 2.0, "thal": 7.0,
+        "age": 52.0,
+        "sex": 1,
+        "cp": 4,
+        "trestbps": 125.0,
+        "chol": 212.0,
+        "fbs": 0,
+        "restecg": 1,
+        "thalach": 168.0,
+        "exang": 0,
+        "oldpeak": 1.0,
+        "slope": 2,
+        "ca": 2.0,
+        "thal": 7.0,
     }
 
 
@@ -99,9 +109,19 @@ def sample_patient() -> dict:
 def sample_patient_no_disease() -> dict:
     """A patient profile typically associated with no disease."""
     return {
-        "age": 35.0, "sex": 0, "cp": 1, "trestbps": 110.0,
-        "chol": 180.0, "fbs": 0, "restecg": 0, "thalach": 185.0,
-        "exang": 0, "oldpeak": 0.0, "slope": 1, "ca": 0.0, "thal": 3.0,
+        "age": 35.0,
+        "sex": 0,
+        "cp": 1,
+        "trestbps": 110.0,
+        "chol": 180.0,
+        "fbs": 0,
+        "restecg": 0,
+        "thalach": 185.0,
+        "exang": 0,
+        "oldpeak": 0.0,
+        "slope": 1,
+        "ca": 0.0,
+        "thal": 3.0,
     }
 
 
@@ -118,6 +138,7 @@ def sample_batch_df(sample_patient, sample_patient_no_disease) -> pd.DataFrame:
 def predictor():
     """Lazy-loaded HeartDiseasePredictor (sklearn backend)."""
     import sys
+
     sys.path.insert(0, str(PROJECT_ROOT))
     from src.models.predict import HeartDiseasePredictor
 
