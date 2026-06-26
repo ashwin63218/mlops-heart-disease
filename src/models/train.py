@@ -72,8 +72,6 @@ log = logging.getLogger(__name__)
 #   1. DagsHub remote  — if DAGSHUB_USERNAME + DAGSHUB_TOKEN are set
 #   2. Local SQLite    — fallback for offline / CI runs
 # ---------------------------------------------------------------------------
-import os
-
 EXPERIMENT_NAME = "heart-disease-classification"
 
 _DAGSHUB_USER = os.getenv("DAGSHUB_USERNAME")
@@ -81,7 +79,9 @@ _DAGSHUB_TOKEN = os.getenv("DAGSHUB_TOKEN")
 _DAGSHUB_REPO = os.getenv("DAGSHUB_REPO", "mlops-heart-disease")
 
 if _DAGSHUB_USER and _DAGSHUB_TOKEN:
-    MLFLOW_TRACKING_URI = f"https://dagshub.com/{_DAGSHUB_USER}/{_DAGSHUB_REPO}.mlflow"
+    MLFLOW_TRACKING_URI = (
+        f"https://dagshub.com/{_DAGSHUB_USER}/{_DAGSHUB_REPO}.mlflow"
+    )
     # DagsHub requires basic-auth credentials on every request
     os.environ["MLFLOW_TRACKING_USERNAME"] = _DAGSHUB_USER
     os.environ["MLFLOW_TRACKING_PASSWORD"] = _DAGSHUB_TOKEN
@@ -90,10 +90,11 @@ else:
     MLFLOW_TRACKING_URI = f"sqlite:///{PROJECT_ROOT / 'mlflow.db'}"
     _TRACKING_BACKEND = "local-sqlite"
 
-
 # ---------------------------------------------------------------------------
 # Model definitions
 # ---------------------------------------------------------------------------
+
+
 def _build_model_configs(tune: bool) -> list[dict[str, Any]]:
     """
     Return a list of model configs.
@@ -503,16 +504,15 @@ def run_training(tune: bool = True, cv_folds: int = 5) -> dict:
         sys.exit(1)
     preprocessor = joblib.load(preprocessor_path)
 
-    full_pipeline = Pipeline(
-        [
-            ("preprocessor", preprocessor),
-            ("classifier", best["best_estimator"]),
-        ]
-    )
+    full_pipeline = Pipeline([
+        ("preprocessor", preprocessor),
+        ("classifier",   best["best_estimator"]),
+    ])
 
     best_model_path = MODELS_DIR / "best_model.joblib"
     joblib.dump(full_pipeline, best_model_path)
-    log.info("Full pipeline (preprocessor + %s) saved → %s", best["model_name"], best_model_path)
+    log.info("Full pipeline (preprocessor + %s) saved → %s",
+             best["model_name"], best_model_path)
 
     # Also log the pipeline as an MLflow artifact on the best run
     with mlflow.start_run(run_id=best["run_id"]):
