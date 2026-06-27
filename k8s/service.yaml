@@ -1,0 +1,127 @@
+# =============================================================================
+# service.yaml — Kubernetes Service for Heart Disease Classifier API
+#
+# Includes two Service objects:
+#   1. ClusterIP  — internal cluster access (default, always created)
+#   2. LoadBalancer — external access (uncomment for cloud deployments)
+#
+# Apply:  kubectl apply -f k8s/service.yaml
+# Status: kubectl get svc heart-disease-api
+# URL:    minikube service heart-disease-api --url   (local only)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Service 1 — ClusterIP (internal)
+# Stable internal DNS: http://heart-disease-api.default.svc.cluster.local:8000
+# Use this for pod-to-pod communication within the cluster.
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: heart-disease-api
+  namespace: default
+  labels:
+    app: heart-disease-api
+    component: inference
+  annotations:
+    description: "Internal ClusterIP service for heart disease inference API"
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: heart-disease-api    # must match Deployment pod labels
+
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80            # port exposed on the Service (cluster-internal)
+      targetPort: 8000    # port the container listens on
+
+---
+# -----------------------------------------------------------------------------
+# Service 2 — LoadBalancer (external)
+# Uncomment this for cloud deployments (GKE, EKS, AKS).
+# For local minikube: run `minikube tunnel` first, then access via EXTERNAL-IP.
+#
+# On AWS EKS — annotate with:
+#   service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+# On GKE — the external IP is provisioned automatically.
+# -----------------------------------------------------------------------------
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: heart-disease-api-external
+#   namespace: default
+#   labels:
+#     app: heart-disease-api
+#     component: inference
+#   annotations:
+#     description: "External LoadBalancer service for heart disease inference API"
+#     # Uncomment for AWS NLB:
+#     # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+# spec:
+#   type: LoadBalancer
+#   selector:
+#     app: heart-disease-api
+#   ports:
+#     - name: http
+#       protocol: TCP
+#       port: 80
+#       targetPort: 8000
+
+---
+# =============================================================================
+# HorizontalPodAutoscaler — scales replicas 2–6 based on CPU utilisation.
+# Requires metrics-server installed in the cluster:
+#   kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+#
+# Apply: kubectl apply -f k8s/service.yaml
+# Watch: kubectl get hpa heart-disease-api --watch
+# =============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: heart-disease-api
+  namespace: default
+  labels:
+    app: heart-disease-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: heart-disease-api
+
+  minReplicas: 2
+  maxReplicas: 6
+
+  metrics:
+    # Scale up when average CPU across pods exceeds 70%
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+    # Scale up when average memory across pods exceeds 80%
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30    # react to spikes quickly
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60             # add at most 2 pods per minute
+    scaleDown:
+      stabilizationWindowSeconds: 300   # wait 5 min before scaling down
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120            # remove at most 1 pod per 2 minutes

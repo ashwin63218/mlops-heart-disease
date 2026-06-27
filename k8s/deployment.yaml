@@ -1,0 +1,222 @@
+# =============================================================================
+# deployment.yaml — Kubernetes Deployment for Heart Disease Classifier API
+#
+# Apply:  kubectl apply -f k8s/deployment.yaml
+# Status: kubectl rollout status deployment/heart-disease-api
+# Logs:   kubectl logs -l app=heart-disease-api --tail=50
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: heart-disease-api
+  namespace: default
+  labels:
+    app: heart-disease-api
+    version: "1.0.0"
+    component: inference
+    managed-by: kubectl
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    description: "Heart Disease Classification API — MLOps Assignment AIMLCZG523"
+
+spec:
+  # ---------------------------------------------------------------------------
+  # Replica count — 2 ensures zero-downtime rolling updates and basic HA.
+  # Scale up via HPA or manually: kubectl scale deployment heart-disease-api --replicas=4
+  # ---------------------------------------------------------------------------
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: heart-disease-api
+
+  # ---------------------------------------------------------------------------
+  # Rolling update strategy — never take all pods down at once.
+  # maxUnavailable: 0  → always keep 2 pods running during update
+  # maxSurge: 1        → spin up 1 extra pod before terminating old ones
+  # ---------------------------------------------------------------------------
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  template:
+    metadata:
+      labels:
+        app: heart-disease-api
+        version: "1.0.0"
+      annotations:
+        # Prometheus auto-discovery — scrapes /metrics on port 8000
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+
+    spec:
+      # -----------------------------------------------------------------------
+      # Security context — run as non-root (matches Dockerfile appuser)
+      # -----------------------------------------------------------------------
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      # -----------------------------------------------------------------------
+      # Graceful shutdown — give uvicorn time to finish in-flight requests
+      # -----------------------------------------------------------------------
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: heart-disease-api
+          image: heart-disease-api:latest
+
+          # -------------------------------------------------------------------
+          # Pull policy: IfNotPresent for local/minikube dev.
+          # Change to Always when pushing to a registry (ECR, GCR, Docker Hub).
+          # -------------------------------------------------------------------
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+
+          # -------------------------------------------------------------------
+          # Environment variables
+          # MODEL_BACKEND: 'sklearn' or 'onnx' (onnx is faster at inference)
+          # DAGSHUB_* injected from a Kubernetes Secret (see below)
+          # -------------------------------------------------------------------
+          env:
+            - name: MODEL_BACKEND
+              value: "sklearn"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: DAGSHUB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: dagshub-credentials
+                  key: username
+                  optional: true    # pod starts even without the secret
+            - name: DAGSHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dagshub-credentials
+                  key: token
+                  optional: true
+
+          # -------------------------------------------------------------------
+          # Resource requests and limits
+          #
+          # requests: guaranteed resources scheduled on the node
+          # limits:   hard cap — container is OOMKilled if memory exceeds limit
+          #
+          # These are conservative for a CPU-only sklearn model.
+          # XGBoost with large datasets may need cpu limit raised to 1000m.
+          # -------------------------------------------------------------------
+          resources:
+            requests:
+              cpu: "250m"       # 0.25 vCPU
+              memory: "512Mi"
+            limits:
+              cpu: "500m"       # 0.5 vCPU
+              memory: "1Gi"
+
+          # -------------------------------------------------------------------
+          # Liveness probe → /health
+          # If this fails 3 times, Kubernetes RESTARTS the container.
+          # Checks that the process is alive (not deadlocked).
+          # initialDelaySeconds: give uvicorn time to bind the port.
+          # -------------------------------------------------------------------
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+          # -------------------------------------------------------------------
+          # Readiness probe → /ready
+          # If this fails, Kubernetes REMOVES the pod from the Service's
+          # endpoint list — no traffic is sent until the model is loaded.
+          # More aggressive timing than liveness since model load takes ~2s.
+          # -------------------------------------------------------------------
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+          # -------------------------------------------------------------------
+          # Startup probe — gives the container up to 60s to start before
+          # liveness kicks in. Prevents premature restarts during cold start.
+          # (initialDelaySeconds * failureThreshold = 5 * 12 = 60s budget)
+          # -------------------------------------------------------------------
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+
+          # -------------------------------------------------------------------
+          # Lifecycle hook — SIGTERM handler
+          # Delays shutdown by 5s so the Service has time to stop routing
+          # traffic to this pod before it goes down (avoids dropped requests).
+          # -------------------------------------------------------------------
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 5"]
+
+      # -----------------------------------------------------------------------
+      # Pod anti-affinity — spread replicas across different nodes so a
+      # single node failure doesn't take down all pods.
+      # -----------------------------------------------------------------------
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - heart-disease-api
+                topologyKey: kubernetes.io/hostname
+
+      # -----------------------------------------------------------------------
+      # Restart policy (default for Deployments — do not change)
+      # -----------------------------------------------------------------------
+      restartPolicy: Always
+
+---
+# =============================================================================
+# Secret template — DagsHub credentials for private model repo access
+# 
+#
+#   echo -n "_username" | base64
+#   echo -n "_token"    | base64
+#
+# Then: kubectl apply -f k8s/dagshub-secret.yaml
+# =============================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dagshub-credentials
+  namespace: default
+  labels:
+    app: heart-disease-api
+type: Opaque
+data:
+  username: "eW91cl91c2VybmFtZQ=="    # base64-encoded DagsHub username
+  token: "eW91cl90b2tlbg=="       # base64-encoded DagsHub token
