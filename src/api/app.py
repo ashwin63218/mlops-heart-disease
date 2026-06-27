@@ -54,14 +54,13 @@ log = logging.getLogger("api")
 # ---------------------------------------------------------------------------
 # Global predictor — initialised once at startup, reused across all requests
 # ---------------------------------------------------------------------------
-_BACKEND = os.getenv("MODEL_BACKEND", "sklearn")   # override with ONNX in prod
+_BACKEND = os.getenv("MODEL_BACKEND", "sklearn")  # override with ONNX in prod
 predictor = HeartDiseasePredictor(backend=_BACKEND)
 
 # ---------------------------------------------------------------------------
 # App startup / shutdown
 # ---------------------------------------------------------------------------
 _startup_time: float = 0.0
-
 
 
 @asynccontextmanager
@@ -100,14 +99,17 @@ app = FastAPI(
 # instrument() registers middleware; expose() adds the /metrics route
 instrumentator = Instrumentator().instrument(app)
 
+
 @app.get("/", tags=["ops"])
 def read_root():
     """Root endpoint to welcome users and point to documentation."""
     return {
         "message": "Welcome to the Heart Disease Classifier API!",
         "documentation": "/docs",
-        "health_check": "/health"
+        "health_check": "/health",
     }
+
+
 # ---------------------------------------------------------------------------
 # Request / Response schemas
 # ---------------------------------------------------------------------------
@@ -116,6 +118,7 @@ class PatientFeatures(BaseModel):
     Raw clinical features for a single patient.
     All values must fall within clinically valid ranges.
     """
+
     age: float = Field(..., ge=1, le=120, description="Age in years")
     sex: int = Field(..., ge=0, le=1, description="Sex: 0=Female, 1=Male")
     cp: int = Field(..., ge=1, le=4, description="Chest pain type (1-4)")
@@ -127,10 +130,10 @@ class PatientFeatures(BaseModel):
     exang: int = Field(..., ge=0, le=1, description="Exercise-induced angina: 0/1")
     oldpeak: float = Field(..., ge=0.0, le=10.0, description="ST depression (exercise vs rest)")
     slope: int = Field(..., ge=1, le=3, description="Slope of peak exercise ST (1-3)")
-    ca:       Optional[float] = Field(
+    ca: Optional[float] = Field(
         None, ge=0, le=3, description="Number of major vessels (0-3); null allowed"
     )
-    thal:     Optional[float] = Field(
+    thal: Optional[float] = Field(
         None, ge=3, le=7, description="Thal: 3=Normal, 6=Fixed defect, 7=Reversible; null allowed"
     )
 
@@ -138,17 +141,29 @@ class PatientFeatures(BaseModel):
     @classmethod
     def allow_null(cls, v):
         """Accept None, empty string, or NaN as missing values for nullable fields."""
-        if v == "" or v != v:   # NaN check: NaN != NaN
+        if v == "" or v != v:  # NaN check: NaN != NaN
             return None
         return v
 
-    model_config = {"json_schema_extra": {
-        "example": {
-            "age": 52, "sex": 1, "cp": 4, "trestbps": 125,
-            "chol": 212, "fbs": 0, "restecg": 1, "thalach": 168,
-            "exang": 0, "oldpeak": 1.0, "slope": 2, "ca": 2, "thal": 7,
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "age": 52,
+                "sex": 1,
+                "cp": 4,
+                "trestbps": 125,
+                "chol": 212,
+                "fbs": 0,
+                "restecg": 1,
+                "thalach": 168,
+                "exang": 0,
+                "oldpeak": 1.0,
+                "slope": 2,
+                "ca": 2,
+                "thal": 7,
+            }
         }
-    }}
+    }
 
 
 class PredictionResponse(BaseModel):
@@ -161,8 +176,7 @@ class PredictionResponse(BaseModel):
 
 class BatchRequest(BaseModel):
     patients: list[PatientFeatures] = Field(
-        ..., min_length=1, max_length=100,
-        description="List of patient records (max 100)"
+        ..., min_length=1, max_length=100, description="List of patient records (max 100)"
     )
 
 
@@ -195,7 +209,10 @@ async def log_requests(request: Request, call_next):
     elapsed = (time.perf_counter() - t0) * 1000
     log.info(
         "%s %s → %d  (%.1f ms)",
-        request.method, request.url.path, response.status_code, elapsed,
+        request.method,
+        request.url.path,
+        response.status_code,
+        elapsed,
     )
     return response
 
@@ -316,11 +333,11 @@ def predict(patient: PatientFeatures):
     pred = result["prediction"]
 
     return {
-        "prediction":  pred,
-        "confidence":  round(prob if pred == 1 else 1 - prob, 4),
+        "prediction": pred,
+        "confidence": round(prob if pred == 1 else 1 - prob, 4),
         "probability": prob,
-        "risk_label":  result["risk_label"],
-        "latency_ms":  result["latency_ms"],
+        "risk_label": result["risk_label"],
+        "latency_ms": result["latency_ms"],
     }
 
 
@@ -355,15 +372,17 @@ def predict_batch(batch: BatchRequest):
     for _, row in result_df.iterrows():
         pred = int(row["prediction"])
         prob = float(row["probability"])
-        predictions.append({
-            "prediction":  pred,
-            "confidence":  round(prob if pred == 1 else 1 - prob, 4),
-            "probability": prob,
-            "risk_label":  str(row["risk_label"]),
-        })
+        predictions.append(
+            {
+                "prediction": pred,
+                "confidence": round(prob if pred == 1 else 1 - prob, 4),
+                "probability": prob,
+                "risk_label": str(row["risk_label"]),
+            }
+        )
 
     return {
         "predictions": predictions,
-        "count":       len(predictions),
-        "latency_ms":  latency_ms,
+        "count": len(predictions),
+        "latency_ms": latency_ms,
     }
