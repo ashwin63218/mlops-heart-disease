@@ -1,0 +1,107 @@
+# =============================================================================
+# docker-compose.yml — Heart Disease MLOps Monitoring Stack
+#
+# Services:
+#   api         — FastAPI inference server  (port 8000)
+#   prometheus  — Metrics collection        (port 9090)
+#   grafana     — Dashboard visualisation   (port 3000)
+#
+# Usage:
+#   docker-compose up --build          # start everything
+#   docker-compose up --build -d       # start in background
+#   docker-compose down                # stop and remove containers
+#   docker-compose logs -f api         # tail API logs
+# =============================================================================
+
+version: "3.9"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # FastAPI inference API
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: heart-disease-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_BACKEND=sklearn
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount models directory so you can swap models without rebuilding
+      - ./models:/app/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # ---------------------------------------------------------------------------
+  # Prometheus — scrapes /metrics from the API every 10s
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.enable-lifecycle"          # allows POST /-/reload to hot-reload config
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # ---------------------------------------------------------------------------
+  # Grafana — visualises Prometheus metrics
+  # Default login: admin / admin  (change on first login)
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      # Auto-provision the Prometheus datasource and dashboard
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+# ---------------------------------------------------------------------------
+# Named volumes — persist data across container restarts
+# ---------------------------------------------------------------------------
+volumes:
+  prometheus_data:
+  grafana_data:
+
+# ---------------------------------------------------------------------------
+# Network — isolated bridge network for service discovery
+# Services reference each other by container name (e.g. http://api:8000)
+# ---------------------------------------------------------------------------
+networks:
+  monitoring:
+    driver: bridge
