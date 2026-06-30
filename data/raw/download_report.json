@@ -1,50 +1,52 @@
 {
-  "row_count": 303,
-  "column_count": 14,
+  "row_count": 920,
+  "column_count": 15,
   "missing_required_columns": [],
   "unexpected_columns": [],
   "missing_value_counts": {
     "age": 0,
     "sex": 0,
     "cp": 0,
-    "trestbps": 0,
-    "chol": 0,
-    "fbs": 0,
-    "restecg": 0,
-    "thalach": 0,
-    "exang": 0,
-    "oldpeak": 0,
-    "slope": 0,
-    "ca": 4,
-    "thal": 2,
-    "target": 0
+    "trestbps": 59,
+    "chol": 30,
+    "fbs": 90,
+    "restecg": 2,
+    "thalach": 55,
+    "exang": 55,
+    "oldpeak": 62,
+    "slope": 309,
+    "ca": 611,
+    "thal": 486,
+    "target": 0,
+    "source": 0
   },
-  "total_missing_values": 6,
+  "total_missing_values": 1759,
   "target_distribution": {
-    "0": 164,
-    "1": 139
+    "1": 509,
+    "0": 411
   },
   "class_balance_pct": {
-    "0": 54.13,
-    "1": 45.87
+    "1": 55.33,
+    "0": 44.67
   },
   "feature_dtypes": {
-    "age": "int64",
-    "sex": "int64",
-    "cp": "int64",
-    "trestbps": "int64",
-    "chol": "int64",
-    "fbs": "int64",
-    "restecg": "int64",
-    "thalach": "int64",
-    "exang": "int64",
+    "age": "float64",
+    "sex": "float64",
+    "cp": "float64",
+    "trestbps": "float64",
+    "chol": "float64",
+    "fbs": "float64",
+    "restecg": "float64",
+    "thalach": "float64",
+    "exang": "float64",
     "oldpeak": "float64",
-    "slope": "int64",
+    "slope": "float64",
     "ca": "float64",
     "thal": "float64",
-    "target": "int64"
+    "target": "int64",
+    "source": "object"
   },
-  "download_timestamp": "2026-06-24T02:50:39.538083Z",
-  "method_used": "uci",
+  "download_timestamp": "2026-06-30T08:58:49.006848Z",
+  "method_used": "direct",
   "output_file": "heart_disease_raw.csv"
 }

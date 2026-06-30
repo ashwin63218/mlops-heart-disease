@@ -1,52 +1,49 @@
 {
   "best_model": "LogisticRegression",
-  "mlflow_run_id": "77c947a0c7844239811ac33a52c960b0",
-  "best_params": {
-    "C": 10.0,
-    "penalty": "l2"
-  },
-  "cv_mean_roc_auc": 0.9019,
-  "cv_std_roc_auc": 0.0132,
+  "mlflow_run_id": "6d300dd2f4e34106818ab827797bf5a4",
+  "best_params": {},
+  "cv_mean_roc_auc": 0.0,
+  "cv_std_roc_auc": 0.0,
   "test_metrics": {
-    "test_accuracy": 0.8852,
-    "test_roc_auc": 0.9621,
-    "test_f1": 0.8814,
-    "test_precision": 0.8387,
-    "test_recall": 0.9286
+    "test_accuracy": 0.8261,
+    "test_roc_auc": 0.9216,
+    "test_f1": 0.8462,
+    "test_precision": 0.8302,
+    "test_recall": 0.8627
   },
   "all_models": [
     {
       "model_name": "LogisticRegression",
       "test_metrics": {
-        "test_accuracy": 0.8852,
-        "test_roc_auc": 0.9621,
-        "test_f1": 0.8814,
-        "test_precision": 0.8387,
-        "test_recall": 0.9286
+        "test_accuracy": 0.8261,
+        "test_roc_auc": 0.9216,
+        "test_f1": 0.8462,
+        "test_precision": 0.8302,
+        "test_recall": 0.8627
       },
-      "elapsed_seconds": 3.3
+      "elapsed_seconds": 0.3
     },
     {
       "model_name": "RandomForest",
       "test_metrics": {
-        "test_accuracy": 0.8852,
-        "test_roc_auc": 0.9545,
-        "test_f1": 0.8814,
-        "test_precision": 0.8387,
-        "test_recall": 0.9286
+        "test_accuracy": 0.8315,
+        "test_roc_auc": 0.909,
+        "test_f1": 0.8531,
+        "test_precision": 0.8257,
+        "test_recall": 0.8824
       },
-      "elapsed_seconds": 1.7
+      "elapsed_seconds": 0.1
     },
     {
       "model_name": "XGBoost",
       "test_metrics": {
-        "test_accuracy": 0.8852,
-        "test_roc_auc": 0.9405,
-        "test_f1": 0.8772,
-        "test_precision": 0.8621,
-        "test_recall": 0.8929
+        "test_accuracy": 0.8424,
+        "test_roc_auc": 0.8913,
+        "test_f1": 0.8626,
+        "test_precision": 0.8349,
+        "test_recall": 0.8922
       },
-      "elapsed_seconds": 0.5
+      "elapsed_seconds": 0.2
     }
   ]
 }

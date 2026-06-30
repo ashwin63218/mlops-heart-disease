@@ -21,9 +21,12 @@ Design principles
 * Continuous columns are scaled with RobustScaler (median + IQR) instead
   of StandardScaler because cholesterol and blood pressure have meaningful
   clinical outliers that should be preserved in proportion.
-* Missing values (only 'ca' and 'thal' in the UCI data) are imputed with
-  the most-frequent value before encoding — appropriate for near-nominal
-  columns with very few missings (~1-2%).
+* Missing values can occur in ANY feature column, not just 'ca' and 'thal' —
+  this is especially true for the merged 4-source UCI dataset (Cleveland +
+  Hungarian + Switzerland + VA), where the non-Cleveland sources collected
+  far fewer fields consistently. Every transformer branch (continuous,
+  binary, nominal, nominal_nan) therefore includes its own SimpleImputer
+  step, so no column can silently pass NaN through to the model.
 
 """
 
@@ -205,37 +208,51 @@ def build_preprocessor() -> ColumnTransformer:
     Constructs the sklearn ColumnTransformer.
 
     Transformer A — continuous features:
-        RobustScaler  (median + IQR normalisation, outlier-resistant)
-        No imputation needed: continuous cols have no missing values in UCI.
+        SimpleImputer (median) → RobustScaler (median + IQR normalisation,
+        outlier-resistant). Median imputation matches RobustScaler's own
+        outlier-resistant philosophy.
 
     Transformer B — binary features:
-        Pass-through (already 0/1, no transformation)
+        SimpleImputer (most_frequent) — fills gaps with the mode, values
+        remain in {0, 1}.
 
-    Transformer C — nominal features (no NaN):
-        OneHotEncoder with drop='first' (avoids multicollinearity)
-        handle_unknown='ignore' (safe for unseen categories at inference)
+    Transformer C — nominal features (cp, restecg, slope):
+        SimpleImputer (most_frequent) → OneHotEncoder with drop='first'
+        (avoids multicollinearity), handle_unknown='ignore' (safe for
+        unseen categories at inference).
 
-    Transformer D — nominal features WITH NaN (ca, thal):
-        SimpleImputer (most_frequent) → OneHotEncoder
-        Chained in a sub-Pipeline so imputation runs first.
+    Transformer D — nominal features with high missingness (ca, thal):
+        SimpleImputer (most_frequent) → OneHotEncoder, same as above.
+        Chained in a sub-Pipeline so imputation runs first. ca/thal are
+        kept as a separate group only for documentation clarity — the
+        actual transformer logic is now identical to Transformer C.
 
     remainder='drop' ensures any unexpected columns are excluded silently,
     preventing silent data leakage if new columns are added upstream.
     """
 
-    # A: Continuous
+    # A: Continuous — impute with median (robust to outliers) before scaling
     continuous_transformer = Pipeline(
         steps=[
+            ("imputer", SimpleImputer(strategy="median")),
             ("scaler", RobustScaler()),
         ]
     )
 
-    # B: Binary — passthrough (sklearn will leave these as-is)
-    # Handled via remainder or explicit passthrough below
+    # B: Binary — impute with most-frequent value (mode), still passthrough-style
+    #    after imputation (no encoding needed, already 0/1)
+    binary_transformer = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+        ]
+    )
 
-    # C: Nominal without NaN
+    # C: Nominal — impute with most-frequent, then one-hot encode.
+    #    NOTE: in the merged 4-source UCI dataset, cp/restecg/slope can also
+    #    contain missing values (not just ca/thal as in Cleveland-only).
     nominal_transformer = Pipeline(
         steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
             (
                 "encoder",
                 OneHotEncoder(
@@ -268,7 +285,7 @@ def build_preprocessor() -> ColumnTransformer:
     preprocessor = ColumnTransformer(
         transformers=[
             ("continuous", continuous_transformer, CONTINUOUS_COLS),
-            ("binary", "passthrough", BINARY_COLS),
+            ("binary", binary_transformer, BINARY_COLS),
             ("nominal", nominal_transformer, NOMINAL_COLS),
             ("nominal_nan", nominal_nan_transformer, NOMINAL_WITH_NAN_COLS),
         ],

@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "n_samples": 61,
+  "n_samples": 184,
   "prediction_match_rate": 1.0,
   "probability_max_diff": 1.1e-07,
   "sklearn_model_type": "LogisticRegression",
