@@ -1,6 +1,6 @@
 {
   "best_model": "LogisticRegression",
-  "mlflow_run_id": "40ac2a3f308c4f60881bebc548aa0099",
+  "mlflow_run_id": "77c947a0c7844239811ac33a52c960b0",
   "best_params": {
     "C": 10.0,
     "penalty": "l2"
@@ -35,7 +35,7 @@
         "test_precision": 0.8387,
         "test_recall": 0.9286
       },
-      "elapsed_seconds": 1.6
+      "elapsed_seconds": 1.7
     },
     {
       "model_name": "XGBoost",
